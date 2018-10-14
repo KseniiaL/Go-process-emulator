@@ -2,8 +2,8 @@ package scheduler
 
 import (
 	"fmt"
-	"math/rand"
 	"github.com/KseniiaL/Go-process-emulator/process"
+	"math/rand"
 )
 
 type Scheduler struct {
@@ -16,7 +16,8 @@ type Scheduler struct {
 	id       uint64
 }
 
-func findMin(s []process.Process) int64 {
+func (sch Scheduler) findMin() int64 {
+	s := sch.SRTF
 	if len(s) == 0 {
 		return -1
 	}
@@ -74,6 +75,54 @@ func (sch *Scheduler) _RR(count int) {
 	}
 }
 
+func (sch *Scheduler) _SRTF(i int, cnt *int) {
+	var s []process.Process
+	min := sch.findMin()
+
+	if min < 0 {
+		*cnt++
+		return
+	}
+
+	for sch.SRTF	[min].ExecTime > 0 {
+
+		sch.SRTF[min].ExecTime--
+
+		if sch.SRTF[min].StartTime == 0 {
+			sch.SRTF[min].StartTime = sch.curT
+		}
+
+		// creating new processes
+		if rand.Uint64()%100 > 80 && i < 50 {
+			num := rand.Uint64()%2 + 1
+			for num > 0 {
+				sch.RR = append(sch.RR, process.Process{}.CreateProcess(sch.curT, sch.id))
+				sch.id++
+				num--
+			}
+			sch.SRTF = append(sch.SRTF, process.Process{}.CreateProcess(sch.curT, sch.id))
+			sch.id++
+		}
+
+		min = sch.findMin()
+		*cnt++
+	}
+
+	for i := range sch.SRTF {
+		if int64(i) != min {
+			s = append(s, sch.SRTF[i])
+		} else {
+			sch.SRTF[i].EndTime = sch.curT + 1
+			sch.SRTF[i].WaitTime = sch.SRTF[i].EndTime - sch.SRTF[i].ActualExec - sch.SRTF[i].CreateTime
+			sch.SRTF[i].WorkTime = sch.SRTF[i].EndTime + sch.SRTF[i].ActualExec - sch.SRTF[i].StartTime - 1
+
+			sch.SRTFfin = append(sch.SRTFfin, sch.SRTF[i])
+		}
+	}
+
+	sch.SRTF = s
+}
+
 func Routine() {
 	cnt := 0
 	scheduler := Scheduler{}
@@ -83,52 +132,7 @@ func Routine() {
 			scheduler._RR(i)
 			cnt++
 		} else {
-
-			var s []process.Process
-			min := findMin(scheduler.SRTF)
-
-			if min < 0 {
-				cnt++
-				continue
-			}
-
-			for scheduler.SRTF[min].ExecTime > 0 {
-
-				scheduler.SRTF[min].ExecTime--
-
-				if scheduler.SRTF[min].StartTime == 0 {
-					scheduler.SRTF[min].StartTime = scheduler.curT
-				}
-
-				// creating new processes
-				if rand.Uint64()%100 > 80 && i < 50 {
-					num := rand.Uint64()%2 + 1
-					for num > 0 {
-						scheduler.RR = append(scheduler.RR, process.Process{}.CreateProcess(scheduler.curT, scheduler.id))
-						scheduler.id++
-						num--
-					}
-					scheduler.SRTF = append(scheduler.SRTF, process.Process{}.CreateProcess(scheduler.curT, scheduler.id))
-					scheduler.id++
-				}
-
-				min = findMin(scheduler.SRTF)
-				cnt++
-			}
-
-			for i := range scheduler.SRTF {
-				if int64(i) != min {
-					s = append(s, scheduler.SRTF[i])
-				} else {
-					scheduler.SRTF[i].EndTime = scheduler.curT + 1
-					scheduler.SRTF[i].WaitTime = scheduler.SRTF[i].EndTime - scheduler.SRTF[i].ActualExec - scheduler.SRTF[i].CreateTime
-					scheduler.SRTF[i].WorkTime = scheduler.SRTF[i].EndTime + scheduler.SRTF[i].ActualExec - scheduler.SRTF[i].StartTime - 1
-
-					scheduler.SRTFfin = append(scheduler.SRTFfin, scheduler.SRTF[i])
-				}
-			}
-
-			scheduler.SRTF = s
+			scheduler._SRTF(i, &cnt)
 		}
 	}
 
